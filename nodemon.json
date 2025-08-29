@@ -1,0 +1,10 @@
+{
+  "watch": ["./"],
+  "ignore": [
+    "C:/DumpStack.log.tmp",
+    "node_modules",
+    ".git"
+  ],
+  "ext": "js,json,env",
+  "legacyWatch": true
+}
