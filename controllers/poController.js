@@ -1,5 +1,6 @@
 const PO = require("../models/PO");
-const puppeteer = require("puppeteer");
+// const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
 
 // Get PO by ID
 const getPOById = async (req, res) => {
@@ -92,7 +93,11 @@ const downloadPO = async (req, res) => {
     `;
 
     // Generate PDF with Puppeteer
-    const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
+    // const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
+    const browser = await puppeteer.launch({
+  executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser",
+  args: ["--no-sandbox", "--disable-setuid-sandbox"],
+});
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
     const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
