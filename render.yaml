@@ -1,10 +1,10 @@
 services:
   - type: web
-    name: my-backend
+    name: nexscm-backend
     env: node
     plan: free
     buildCommand: |
       apt-get update
       apt-get install -y chromium
       npm install
-    startCommand: node app.js
+    startCommand: npm start
