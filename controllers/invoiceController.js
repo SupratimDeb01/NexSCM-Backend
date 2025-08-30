@@ -1,7 +1,8 @@
 // controllers/invoiceController.js
 const Invoice = require("../models/Invoice");
 const PO = require("../models/PO");
-const puppeteer = require("puppeteer");
+// const puppeteer = require("puppeteer");
+const { chromium } = require("playwright");
 
 // Supplier submits invoice
 const submitInvoice = async (req, res) => {
@@ -174,10 +175,11 @@ const downloadInvoice = async (req, res) => {
     `;
 
     // Generate PDF
-       const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      headless: "new", // stable headless mode
-    });
+    // const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
+    const browser = await chromium.launch({
+  headless: true,
+  args: ["--no-sandbox", "--disable-setuid-sandbox"],
+});
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
     const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
