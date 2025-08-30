@@ -176,7 +176,7 @@ const downloadInvoice = async (req, res) => {
     // Generate PDF
        const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
+      headless: "new", // stable headless mode
     });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
