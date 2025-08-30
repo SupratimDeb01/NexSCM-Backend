@@ -4,8 +4,7 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "nodemon app.js",
-    "postinstall": "apt-get update && apt-get install -y chromium"
+    "dev": "nodemon app.js"
   },
   "keywords": [],
   "author": "",
@@ -21,8 +20,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.16.1",
     "multer": "^2.0.1",
-    "puppeteer": "^24.17.1",
-    "puppeteer-core": "^24.17.1"
+    "puppeteer": "^24.17.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
