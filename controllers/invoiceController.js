@@ -177,8 +177,12 @@ const downloadInvoice = async (req, res) => {
     // Generate PDF
     // const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
     const browser = await puppeteer.launch({
-  executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser",
-  args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
+  args: [ "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--no-zygote",],
 });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
@@ -206,3 +210,4 @@ module.exports = {
   getInvoicesForUser,
   downloadInvoice
 };
+
