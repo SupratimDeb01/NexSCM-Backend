@@ -1,131 +1,52 @@
-// controllers/invoiceController.js
-const Invoice = require("../models/Invoice");
 const PO = require("../models/PO");
 const puppeteer = require("puppeteer");
 
-// Supplier submits invoice
-const submitInvoice = async (req, res) => {
+// Get PO by ID
+const getPOById = async (req, res) => {
   try {
-    const { poId, items, totalAmount } = req.body;
-    const po = await PO.findById(poId);
+    const po = await PO.findById(req.params.id).populate("manufacturer supplier bid rfq");
+    if (!po) return res.status(404).json({ message: "PO not found" });
+    res.json(po);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Get all POs for logged-in user (supplier or manufacturer)
+const getPOsForUser = async (req, res) => {
+  try {
+    const pos = await PO.find({ $or: [{ manufacturer: req.user._id }, { supplier: req.user._id }] })
+      .populate("manufacturer supplier bid rfq");
+    res.json(pos);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Mark PO as delivered (supplier action)
+const markDelivered = async (req, res) => {
+  try {
+    const po = await PO.findById(req.params.id);
     if (!po) return res.status(404).json({ message: "PO not found" });
 
-    const invoice = await Invoice.create({
-      po: po._id,
-      supplier: req.user._id,
-      manufacturer: po.manufacturer,
-      items,
-      totalAmount,
-    });
-
-    // 🔑 Update PO with reference to invoice
-    po.invoice = invoice._id;
+    po.status = "delivered";
     await po.save();
 
-    res.status(201).json(invoice);
+    res.json({ message: "PO marked as delivered", po });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Manufacturer verifies invoice
-const verifyInvoice = async (req, res) => {
+// Download PO as PDF (supplier)
+const downloadPO = async (req, res) => {
   try {
-    const invoice = await Invoice.findById(req.params.id).populate("po");
-    if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+    const po = await PO.findById(req.params.id)
+      .populate("manufacturer supplier bid rfq");
 
-    // Simple verification: amount matches PO
-    if (invoice.totalAmount === invoice.po.totalAmount) {
-      invoice.status = "approved";
-      await invoice.save();
-      res.json({ message: "Invoice approved", invoice });
-    } else {
-      invoice.status = "disputed";
-      await invoice.save();
-      res.json({ message: "Invoice amount mismatch, disputed", invoice });
-    }
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
+    if (!po) return res.status(404).json({ message: "PO not found" });
 
-// ✅ Fixed: Get invoices for logged-in user (with filtering + population)
-const getInvoicesForUser = async (req, res) => {
-  try {
-    let invoices;
-
-    if (req.user.role === "manufacturer") {
-      invoices = await Invoice.find()
-        .populate({
-          path: "po",
-          match: { manufacturer: req.user._id }, // only this manufacturer’s POs
-          populate: [
-            { path: "supplier", select: "name email" },
-            { path: "rfq", select: "title quantity" }
-          ],
-        })
-        .populate("manufacturer", "name email");
-
-      invoices = invoices.filter(inv => inv.po !== null);
-    } else if (req.user.role === "supplier") {
-      invoices = await Invoice.find()
-        .populate({
-          path: "po",
-          match: { supplier: req.user._id }, // only this supplier’s POs
-          populate: [
-            { path: "manufacturer", select: "name email" },
-            { path: "rfq", select: "title quantity" }
-          ],
-        })
-        .populate("supplier", "name email");
-
-      invoices = invoices.filter(inv => inv.po !== null);
-    } else {
-      return res.status(403).json({ message: "Unauthorized role" });
-    }
-
-    res.json(invoices);
-  } catch (error) {
-    console.error("Error fetching invoices:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
-
-// Dispute invoice
-const disputeInvoice = async (req, res) => {
-  try {
-    const invoice = await Invoice.findById(req.params.id);
-    if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-
-    invoice.status = "disputed";
-    await invoice.save();
-    res.json({ message: "Invoice disputed", invoice });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
-
-// Download invoice as PDF
-const downloadInvoice = async (req, res) => {
-  try {
-    const invoice = await Invoice.findById(req.params.id)
-      .populate("po")
-      .populate("supplier", "name email")
-      .populate("manufacturer", "name email");
-
-    if (!invoice) {
-      return res.status(404).json({ message: "Invoice not found" });
-    }
-
-    // Authorization: only supplier or manufacturer can download
-    if (
-      invoice.supplier._id.toString() !== req.user._id.toString() &&
-      invoice.manufacturer._id.toString() !== req.user._id.toString()
-    ) {
-      return res.status(403).json({ message: "Not authorized to download this invoice" });
-    }
-
-    // Build HTML template
+    // HTML template for the invoice
     const html = `
       <html>
         <head>
@@ -136,16 +57,14 @@ const downloadInvoice = async (req, res) => {
             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             th { background-color: #f2f2f2; }
             .total { text-align: right; font-weight: bold; }
-            .status { margin-top: 15px; font-style: italic; }
           </style>
         </head>
         <body>
-          <h1>Invoice</h1>
-          <p><strong>Invoice ID:</strong> ${invoice._id}</p>
-          <p><strong>PO ID:</strong> ${invoice.po._id}</p>
-          <p><strong>Supplier:</strong> ${invoice.supplier.name} (${invoice.supplier.email})</p>
-          <p><strong>Manufacturer:</strong> ${invoice.manufacturer.name} (${invoice.manufacturer.email})</p>
-          <p><strong>Date:</strong> ${new Date(invoice.createdAt).toLocaleDateString()}</p>
+          <h1>Purchase Order (PO)</h1>
+          <p><strong>PO ID:</strong> ${po._id}</p>
+          <p><strong>Manufacturer:</strong> ${po.manufacturer.name}</p>
+          <p><strong>Supplier:</strong> ${po.supplier.name}</p>
+          <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
 
           <table>
             <tr>
@@ -154,7 +73,7 @@ const downloadInvoice = async (req, res) => {
               <th>Unit Price</th>
               <th>Total</th>
             </tr>
-            ${invoice.items
+            ${po.items
               .map(
                 item => `
                 <tr>
@@ -167,13 +86,12 @@ const downloadInvoice = async (req, res) => {
               )
               .join("")}
           </table>
-          <p class="total">Grand Total: ${invoice.totalAmount.toFixed(2)}</p>
-          <p class="status">Status: ${invoice.status}</p>
+          <p class="total">Grand Total: ${po.totalAmount.toFixed(2)}</p>
         </body>
       </html>
     `;
 
-    // Generate PDF
+    // Generate PDF with Puppeteer
        const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
       executablePath: puppeteer.executablePath(),
@@ -183,10 +101,10 @@ const downloadInvoice = async (req, res) => {
     const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
     await browser.close();
 
-    // Send PDF
+    // Send PDF as downloadable file
     res.set({
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename=Invoice_${invoice._id}.pdf`,
+      "Content-Disposition": `attachment; filename=PO_${po._id}.pdf`,
       "Content-Length": pdfBuffer.length,
     });
 
@@ -198,9 +116,8 @@ const downloadInvoice = async (req, res) => {
 };
 
 module.exports = {
-  submitInvoice,
-  verifyInvoice,
-  disputeInvoice,
-  getInvoicesForUser,
-  downloadInvoice
+  getPOById,
+  getPOsForUser,
+  markDelivered,
+  downloadPO,
 };
