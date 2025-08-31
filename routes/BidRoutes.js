@@ -23,8 +23,9 @@ router.post("/:rfqId", protect, submitBid);
 router.get("/my-bids", protect, getMyBids);
 
 
-// Recommend best bid automatically (system or manufacturer triggers)
-router.put("/:bidId/recommend", protect, recommendBid);
+// Recommend best bid for a specific RFQ
+router.put("/rfq/:rfqId/recommend", protect, recommendBid);
+
 
 
 // Manufacturer selects a bid → creates PO
