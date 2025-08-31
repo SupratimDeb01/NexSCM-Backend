@@ -47,9 +47,6 @@ const recommendBid = async (req, res) => {
 
     const bestBid = bids.reduce((prev, curr) => (curr.total < prev.total ? curr : prev));
 
-    bestBid.status = "RECOMMENDED";
-    await bestBid.save();
-
     res.json({ message: "Bid recommended", bid: bestBid });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
